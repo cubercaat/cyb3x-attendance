@@ -91,25 +91,65 @@ async def assign_teacher(db: AsyncSession, group_id: int, teacher_user_id: int, 
         await db.commit()
 
 
-async def add_student(db: AsyncSession, group_id: int, user_id: int, number: int | None = None) -> None:
+async def add_student(db: AsyncSession, group_id: int, user_id: int, number: int | None = None,
+                      confirmed: bool = True) -> str:
+    """Natija: 'added' | 'exists' | 'pending_exists'."""
     exists = (
         await db.execute(
             select(m.GroupMember).where(m.GroupMember.group_id == group_id, m.GroupMember.user_id == user_id)
         )
     ).scalar_one_or_none()
-    if not exists:
-        db.add(m.GroupMember(group_id=group_id, user_id=user_id, number=number))
-        await db.commit()
+    if exists:
+        return "exists" if exists.confirmed else "pending_exists"
+    db.add(m.GroupMember(group_id=group_id, user_id=user_id, number=number, confirmed=confirmed))
+    await db.commit()
+    return "added"
 
 
-async def group_students(db: AsyncSession, group_id: int) -> list[m.User]:
+async def group_students(db: AsyncSession, group_id: int, only_confirmed: bool = True) -> list[m.User]:
     q = (
         select(m.User)
         .join(m.GroupMember, m.GroupMember.user_id == m.User.id)
         .where(m.GroupMember.group_id == group_id)
         .order_by(m.GroupMember.number.nulls_last(), m.User.full_name)
     )
+    if only_confirmed:
+        q = q.where(m.GroupMember.confirmed == True)  # noqa: E712
     return list((await db.execute(q)).scalars())
+
+
+async def pending_students(db: AsyncSession, group_id: int) -> list[m.User]:
+    q = (
+        select(m.User)
+        .join(m.GroupMember, m.GroupMember.user_id == m.User.id)
+        .where(m.GroupMember.group_id == group_id, m.GroupMember.confirmed == False)  # noqa: E712
+        .order_by(m.User.full_name)
+    )
+    return list((await db.execute(q)).scalars())
+
+
+async def is_confirmed_member(db: AsyncSession, group_id: int, user_id: int) -> bool:
+    gm = (await db.execute(select(m.GroupMember).where(
+        m.GroupMember.group_id == group_id, m.GroupMember.user_id == user_id))).scalar_one_or_none()
+    return bool(gm and gm.confirmed)
+
+
+async def confirm_member(db: AsyncSession, group_id: int, user_id: int) -> bool:
+    gm = (await db.execute(select(m.GroupMember).where(
+        m.GroupMember.group_id == group_id, m.GroupMember.user_id == user_id))).scalar_one_or_none()
+    if not gm:
+        return False
+    gm.confirmed = True
+    await db.commit()
+    return True
+
+
+async def remove_member(db: AsyncSession, group_id: int, user_id: int) -> None:
+    gm = (await db.execute(select(m.GroupMember).where(
+        m.GroupMember.group_id == group_id, m.GroupMember.user_id == user_id))).scalar_one_or_none()
+    if gm:
+        await db.delete(gm)
+        await db.commit()
 
 
 # --------------------------------------------------------------------------- #

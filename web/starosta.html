@@ -20,6 +20,22 @@
 
 <!-- Panel -->
 <div id="panel" class="hide">
+  <!-- Guruhga qo'shilish havolasi -->
+  <div class="card hl">
+    <h3 style="margin-top:0">🔗 Guruhga qo'shilish havolasi</h3>
+    <p class="muted">Shu havolani guruhingiz talabalariga tashlang. Ular bosib, ism-familiyasini
+    yozib ro'yxatdan o'tadi — keyin siz tasdiqlaysiz.</p>
+    <div class="linkbox"><span id="joinLink">…</span></div>
+    <button class="btn" id="btnCopy" style="margin-top:10px">📋 Havolani nusxalash</button>
+  </div>
+
+  <!-- Tasdiqlash kutayotganlar -->
+  <div class="card" id="pendCard">
+    <div class="row sb"><h3 style="margin:0">⏳ Tasdiqlashni kutayotganlar</h3>
+      <span class="pill warn" id="pendCount">0</span></div>
+    <div id="pendList" class="muted" style="margin-top:10px">Yuklanmoqda…</div>
+  </div>
+
   <div class="card" id="noSess"><p class="muted center">Hozircha faol davomat yo‘q. Ustoz boshlaganda ko‘rinadi.</p></div>
   <div id="liveCard" class="card hide">
     <div class="muted" id="info"></div>
@@ -48,7 +64,32 @@ el('btnLogin').onclick=async()=>{
   STOKEN=d.token; localStorage.setItem('cyb3x_starosta',STOKEN);
   el('who').textContent=d.name; enter();
 };
-function enter(){ hide('loginBox'); show('panel'); refresh(); timer=setInterval(refresh,3500); }
+function enter(){ hide('loginBox'); show('panel'); refresh(); refreshPending(); timer=setInterval(()=>{refresh();refreshPending();},4000); }
+
+let JOIN_LINK='';
+async function refreshPending(){
+  const r=await sapi('/api/starosta/pending');
+  if(r._status===401||r._status===403){ localStorage.removeItem('cyb3x_starosta'); location.reload(); return; }
+  if(!r.ok) return;
+  JOIN_LINK=r.join_link||''; el('joinLink').textContent=JOIN_LINK;
+  el('pendCount').textContent=r.pending.length;
+  if(!r.pending.length){ el('pendList').textContent='Yangi so‘rov yo‘q ✅'; return; }
+  el('pendList').innerHTML=r.pending.map(s=>`<div class="list-item">
+    <span>${s.name} ${s.username?'<span class="muted">@'+s.username+'</span>':''}</span>
+    <span>
+      <button class="btn sm" onclick="conf(${s.id},true)">✔ Tasdiqlash</button>
+      <button class="btn ghost sm" onclick="conf(${s.id},false)">✘</button>
+    </span></div>`).join('');
+}
+async function conf(sid,approve){
+  const r=await sapi('/api/starosta/confirm',{student_id:sid,approve});
+  if(r.ok){ toast(approve?'✅ Tasdiqlandi':'Rad etildi'); refreshPending(); refresh(); } else toast(r.error,true);
+}
+window.conf=conf;
+el('btnCopy').onclick=()=>{
+  navigator.clipboard.writeText(JOIN_LINK).then(()=>toast('📋 Havola nusxalandi'))
+    .catch(()=>toast('Nusxalab bo‘lmadi — qo‘lda belgilang',true));
+};
 async function refresh(){
   const r=await sapi('/api/starosta/live');
   if(r._status===401||r._status===403){ localStorage.removeItem('cyb3x_starosta'); location.reload(); return; }

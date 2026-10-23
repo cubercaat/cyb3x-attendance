@@ -24,7 +24,6 @@ services:
         generateValue: true
       - key: TOKEN_TTL_SECONDS
         value: "8"
-      - key: PORT
-        value: "8080"
+      # PORT ni Render o'zi beradi (odatda 10000). Ilova uni muhitdan o'qiydi.
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./cyb3x.db

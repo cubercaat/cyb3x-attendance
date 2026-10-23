@@ -16,9 +16,15 @@ class Base(DeclarativeBase):
 
 async def init_db() -> None:
     from app import models  # noqa: F401 — modellarni ro'yxatdan o'tkazish uchun
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Yengil migratsiya — eski bazaga yangi ustun qo'shish (bo'lmasa)
+        try:
+            await conn.execute(text("ALTER TABLE group_members ADD COLUMN confirmed BOOLEAN DEFAULT 1"))
+        except Exception:
+            pass  # ustun allaqachon mavjud
 
 
 async def get_session() -> AsyncSession:

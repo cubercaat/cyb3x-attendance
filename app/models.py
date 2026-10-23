@@ -90,6 +90,8 @@ class GroupMember(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     number: Mapped[int | None] = mapped_column(Integer, nullable=True)  # jurnal raqami
+    # Havola orqali o'zi qo'shilgan talaba starosta tasdig'ini kutadi (confirmed=False)
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class TeacherAssignment(Base):

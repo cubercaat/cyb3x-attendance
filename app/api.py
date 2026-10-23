@@ -252,12 +252,14 @@ async def student_prepare(req: Request, x_init_data: str = Header(None, alias="X
                 return err("QR eskirdi — doskadagi YANGI QR ni skanerlang", 409)
             return err("Sessiya topilmadi yoki kod/QR noto'g'ri", 404)
 
-        # Faqat o'z guruhining talabasi
+        # Faqat o'z guruhining TASDIQLANGAN talabasi
         in_group = (await db.execute(select(m.GroupMember).where(
             m.GroupMember.group_id == s.group_id, m.GroupMember.user_id == u.id))).scalar_one_or_none()
         if not in_group:
             await svc.security_event(db, u.tg_id, "wrong_group", f"sid={s.id}", ip)
             return err("Siz bu guruh talabasi emassiz", 403)
+        if not in_group.confirmed:
+            return err("⏳ Starosta hali sizni tasdiqlamagan. Tasdiqlangach belgilay olasiz.", 403)
 
         if await svc.already_marked(db, s.id, u.id):
             return err("Siz allaqachon belgilangansiz ✔", 409)
@@ -541,9 +543,12 @@ async def admin_overview(x_init_data: str = Header(None, alias="X-Init-Data")):
         glist = []
         for g in groups:
             studs = await svc.group_students(db, g.id)
+            pend = await svc.pending_students(db, g.id)
             tcount = (await db.execute(select(func.count()).select_from(m.TeacherAssignment)
                                        .where(m.TeacherAssignment.group_id == g.id))).scalar()
-            glist.append({"id": g.id, "name": g.name, "students": len(studs), "teachers": tcount})
+            glist.append({"id": g.id, "name": g.name, "students": len(studs),
+                          "pending": len(pend), "teachers": tcount,
+                          "join_link": await _group_join_link(g.id)})
         users_total = (await db.execute(select(func.count()).select_from(m.User))).scalar()
         faceid_total = (await db.execute(select(func.count()).select_from(m.User)
                                          .where(m.User.faceid_registered == True))).scalar()  # noqa: E712
@@ -723,3 +728,53 @@ async def starosta_students(req: Request):
         stz = await _starosta_from(req, db)
         studs = await svc.group_students(db, stz.group_id)
         return ok(students=[{"id": x.id, "name": x.full_name or str(x.tg_id)} for x in studs])
+
+
+@app.post("/api/starosta/pending")
+async def starosta_pending(req: Request):
+    """Tasdiqlashni kutayotgan (havola orqali qo'shilgan) talabalar + guruh havolasi."""
+    async with SessionLocal() as db:
+        stz = await _starosta_from(req, db)
+        pend = await svc.pending_students(db, stz.group_id)
+        link = await _group_join_link(stz.group_id)
+        return ok(
+            pending=[{"id": x.id, "name": x.full_name or str(x.tg_id),
+                      "username": x.username} for x in pend],
+            join_link=link,
+        )
+
+
+@app.post("/api/starosta/confirm")
+async def starosta_confirm(req: Request):
+    body = await req.json()
+    async with SessionLocal() as db:
+        stz = await _starosta_from(req, db)
+        sid = int(body["student_id"])
+        approve = bool(body.get("approve", True))
+        # Talaba shu guruhning kutayotgani ekanini tekshiramiz
+        if approve:
+            okc = await svc.confirm_member(db, stz.group_id, sid)
+            await svc.audit(db, None, "starosta_confirm", f"{stz.login} g={stz.group_id} s={sid}")
+            if not okc:
+                return err("Talaba topilmadi", 404)
+            # Talabaga xabar
+            stu = (await db.execute(select(m.User).where(m.User.id == sid))).scalar_one_or_none()
+            if stu:
+                try:
+                    from app.bot import notify
+                    await notify(stu.tg_id, "✅ Starosta sizni tasdiqladi! Endi davomat belgilay olasiz.")
+                except Exception:
+                    pass
+        else:
+            await svc.remove_member(db, stz.group_id, sid)
+            await svc.audit(db, None, "starosta_reject", f"{stz.login} g={stz.group_id} s={sid}")
+        return ok()
+
+
+async def _group_join_link(group_id: int) -> str:
+    try:
+        from app.bot import join_link
+        return await join_link(group_id)
+    except Exception:
+        # Bot o'chiq bo'lsa — BOT_USERNAME dan yasaymiz
+        return f"https://t.me/{settings.bot_username}?start=g{group_id}"

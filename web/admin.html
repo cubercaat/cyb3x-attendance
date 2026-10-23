@@ -138,8 +138,12 @@ async function boot(){
 async function loadOverview(){
   const r=await api('/api/admin/overview'); if(!r.ok) return;
   el('oGroups').textContent=r.groups.length; el('oUsers').textContent=r.users_total; el('oFace').textContent=r.faceid_total;
-  el('oGrpList').innerHTML = r.groups.map(g=>`<div class="list-item"><span>#${g.id} ${g.name}</span>
-     <span class="muted">${g.students} talaba · ${g.teachers} ustoz</span></div>`).join('')||'yo‘q';
+  el('oGrpList').innerHTML = r.groups.map(g=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+     <div class="row sb"><b>#${g.id} ${g.name}</b>
+       <span class="muted">${g.students} talaba${g.pending?` · <span class="s-late">${g.pending} kutmoqda</span>`:''} · ${g.teachers} ustoz</span></div>
+     <div class="linkbox" style="margin-top:6px"><span>${g.join_link}</span></div>
+     <button class="btn sm" style="margin-top:6px" onclick="cp('${g.join_link}')">📋 Havolani nusxalash</button>
+     </div>`).join('')||'yo‘q';
   el('oSessList').innerHTML = r.sessions.map(s=>`<div class="list-item"><span>#${s.id} g${s.group_id} · ${s.para}-para</span>
      <span class="muted">${s.when} · ${s.status}</span></div>`).join('')||'yo‘q';
   el('secList').innerHTML = r.security.map(e=>`<div class="list-item"><span class="s-late">${e.kind}</span>
@@ -169,6 +173,8 @@ async function loadStarostas(){
 }
 async function tgl(login){ await act('starosta_toggle',{login},'O‘zgartirildi'); loadStarostas(); }
 window.tgl=tgl;
+function cp(link){ navigator.clipboard.writeText(link).then(()=>toast('📋 Nusxalandi')).catch(()=>toast('Qo‘lda belgilang',true)); }
+window.cp=cp;
 el('btnPurge').onclick=()=>{ if(confirm('Barcha davomat yozuvlari 0 ga tushsinmi? (talaba va Face ID saqlanadi)'))
   act('purge_now',{days:0},'🗑 Baza tozalandi'); };
 boot();
