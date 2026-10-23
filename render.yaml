@@ -10,6 +10,8 @@ services:
     startCommand: python -m app.main
     healthCheckPath: /healthz
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
       - key: BOT_TOKEN
         sync: false
       - key: BOT_USERNAME
