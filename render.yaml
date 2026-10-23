@@ -1,0 +1,28 @@
+# Render.com uchun bir tugmali deploy.
+# render.com -> New -> Blueprint -> shu repo ni ulang.
+# Keyin Environment bo'limida BOT_TOKEN, SUPER_ADMIN_ID, PUBLIC_URL, SECRET_KEY ni to'ldiring.
+services:
+  - type: web
+    name: cyb3x-davomat
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.main
+    healthCheckPath: /healthz
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: BOT_USERNAME
+        value: cyb3xbot
+      - key: SUPER_ADMIN_ID
+        sync: false
+      - key: PUBLIC_URL
+        sync: false         # masalan https://cyb3x-davomat.onrender.com
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TOKEN_TTL_SECONDS
+        value: "8"
+      - key: PORT
+        value: "8080"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./cyb3x.db

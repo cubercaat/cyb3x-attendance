@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CYB3X — Starosta</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="brand"><div class="logo">C</div>
+  <div><b>STAROSTA</b><small id="who">Kirish</small></div></div>
+
+<!-- Login -->
+<div id="loginBox" class="card hl">
+  <h3 style="margin-top:0">🔑 Kirish</h3>
+  <label>Login</label><input id="login" autocomplete="username">
+  <label>Parol</label><input id="pass" type="password" autocomplete="current-password">
+  <button class="btn" id="btnLogin" style="margin-top:12px">Kirish</button>
+</div>
+
+<!-- Panel -->
+<div id="panel" class="hide">
+  <div class="card" id="noSess"><p class="muted center">Hozircha faol davomat yo‘q. Ustoz boshlaganda ko‘rinadi.</p></div>
+  <div id="liveCard" class="card hide">
+    <div class="muted" id="info"></div>
+    <div class="stat">
+      <div class="b"><div class="n s-present" id="cP">0</div><div class="l">Keldi</div></div>
+      <div class="b"><div class="n s-late" id="cL">0</div><div class="l">Kech</div></div>
+      <div class="b"><div class="n s-absent" id="cA">0</div><div class="l">Kelmadi</div></div>
+    </div>
+  </div>
+  <div id="listCard" class="card hide"><h3 style="margin-top:0">Talabalar</h3><div id="list"></div></div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+let STOKEN=localStorage.getItem('cyb3x_starosta')||null, SID=null, timer=null;
+
+async function sapi(path, body){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Starosta':STOKEN||''},body:JSON.stringify(body||{})});
+  let d={}; try{d=await r.json();}catch(e){} d._status=r.status; if(!r.ok&&d.ok===undefined)d={ok:false,error:d.error||('HTTP '+r.status)}; return d;
+}
+el('btnLogin').onclick=async()=>{
+  const r=await fetch('/api/starosta/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({login:el('login').value,password:el('pass').value})});
+  const d=await r.json();
+  if(!d.ok){ toast(d.error||'Xato',true); return; }
+  STOKEN=d.token; localStorage.setItem('cyb3x_starosta',STOKEN);
+  el('who').textContent=d.name; enter();
+};
+function enter(){ hide('loginBox'); show('panel'); refresh(); timer=setInterval(refresh,3500); }
+async function refresh(){
+  const r=await sapi('/api/starosta/live');
+  if(r._status===401||r._status===403){ localStorage.removeItem('cyb3x_starosta'); location.reload(); return; }
+  if(!r.ok) return;
+  if(!r.active){ show('noSess'); hide('liveCard'); hide('listCard'); return; }
+  hide('noSess'); show('liveCard'); show('listCard'); SID=r.session_id;
+  el('info').innerHTML='🟢 <b>'+r.para+'-para</b> faol';
+  el('cP').textContent=r.present; el('cL').textContent=r.late; el('cA').textContent=r.absent;
+  const studs=await sapi('/api/starosta/students');
+  const marks={}; r.rows.forEach(x=>marks[x.name]=x.status);
+  el('list').innerHTML=studs.students.map(s=>{
+    const st=marks[s.name]||'absent';
+    const cls=st==='present'?'s-present':st==='late'?'s-late':'s-absent';
+    const ic=st==='present'?'✔':st==='late'?'⏰':'·';
+    return `<div class="list-item"><span>${s.name} <span class="${cls}">${ic}</span></span><span>
+      <button class="btn sm" onclick="mk(${s.id},'present')">✔</button>
+      <button class="btn ghost sm" onclick="mk(${s.id},'late')">⏰</button>
+      <button class="btn ghost sm" onclick="mk(${s.id},'absent')">✘</button></span></div>`;
+  }).join('');
+}
+async function mk(sid,status){ const r=await sapi('/api/starosta/manual',{session_id:SID,student_id:sid,status});
+  if(r.ok){toast('Belgilandi');refresh();}else toast(r.error,true); }
+window.mk=mk;
+if(STOKEN){ sapi('/api/starosta/live').then(r=>{ if(r.ok) enter(); else { localStorage.removeItem('cyb3x_starosta'); } }); }
+</script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CYB3X — Super Admin</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="brand"><div class="logo">C</div>
+  <div><b>SUPER ADMIN</b><small id="who">Panel</small></div></div>
+
+<div class="tabs">
+  <button data-t="over" class="active">📊 Umumiy</button>
+  <button data-t="grp">📚 Guruhlar</button>
+  <button data-t="usr">👤 Rollar</button>
+  <button data-t="str">📋 Starosta</button>
+  <button data-t="sec">🛡 Xavfsizlik</button>
+</div>
+
+<!-- Umumiy -->
+<div id="tab-over">
+  <div class="card">
+    <div class="stat">
+      <div class="b"><div class="n" id="oGroups">0</div><div class="l">Guruh</div></div>
+      <div class="b"><div class="n" id="oUsers">0</div><div class="l">Foydalanuvchi</div></div>
+      <div class="b"><div class="n s-present" id="oFace">0</div><div class="l">Face ID</div></div>
+    </div>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Guruhlar</h3><div id="oGrpList" class="muted">…</div></div>
+  <div class="card"><h3 style="margin-top:0">Oxirgi sessiyalar</h3><div id="oSessList" class="muted">…</div></div>
+</div>
+
+<!-- Guruhlar -->
+<div id="tab-grp" class="hide">
+  <div class="card">
+    <h3 style="margin-top:0">Yangi guruh</h3>
+    <input id="gName" placeholder="Masalan: 21-14">
+    <button class="btn" id="gCreate" style="margin-top:10px">➕ Guruh yaratish</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Ustoz biriktirish</h3>
+    <p class="muted">Ustozlar bir-biridan bexabar — faqat o'z guruhini ko'radi.</p>
+    <label>Guruh ID</label><input id="atGroup" inputmode="numeric" placeholder="1">
+    <label>Ustoz Telegram ID</label><input id="atTg" inputmode="numeric" placeholder="123456789">
+    <label>Fan</label><input id="atSubj" placeholder="Dasturlash">
+    <button class="btn" id="atGo" style="margin-top:10px">🎓 Biriktirish</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Talaba qo'shish</h3>
+    <label>Guruh ID</label><input id="asGroup" inputmode="numeric" placeholder="1">
+    <label>Talaba Telegram ID</label><input id="asTg" inputmode="numeric" placeholder="123456789">
+    <button class="btn" id="asGo" style="margin-top:10px">➕ Qo'shish</button>
+    <p class="muted" style="margin-top:8px">Telegram ID ni @userinfobot dan oling.</p>
+  </div>
+</div>
+
+<!-- Rollar / qurilma -->
+<div id="tab-usr" class="hide">
+  <div class="card">
+    <h3 style="margin-top:0">Rol berish</h3>
+    <label>Telegram ID</label><input id="rTg" inputmode="numeric">
+    <label>Rol</label>
+    <select id="rRole">
+      <option value="student">Talaba</option>
+      <option value="teacher">Ustoz</option>
+      <option value="admin">Admin</option>
+      <option value="super_admin">Super admin</option>
+    </select>
+    <button class="btn" id="rGo" style="margin-top:10px">💾 Saqlash</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Qurilmani reset qilish</h3>
+    <p class="muted">Talaba telefon almashtirsa — Face ID va qurilma bog'lanishini tozalaydi,
+    u yangi telefonda qayta ro'yxatdan o'tadi.</p>
+    <label>Telegram ID</label><input id="dTg" inputmode="numeric">
+    <button class="btn ghost" id="dReset" style="margin-top:10px">🔄 Reset Face ID / qurilma</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Bloklash</h3>
+    <label>Telegram ID</label><input id="bTg" inputmode="numeric">
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn red sm" id="bBlock">⛔️ Bloklash</button>
+      <button class="btn ghost sm" id="bUnblock">✅ Blokdan chiqarish</button>
+    </div>
+  </div>
+</div>
+
+<!-- Starosta -->
+<div id="tab-str" class="hide">
+  <div class="card">
+    <h3 style="margin-top:0">Starosta yaratish</h3>
+    <p class="muted">Starosta web orqali login/parol bilan kiradi (Telegramsiz).</p>
+    <label>Guruh ID</label><input id="stGroup" inputmode="numeric">
+    <label>Ism</label><input id="stName" placeholder="Ism Familiya">
+    <label>Login</label><input id="stLogin" placeholder="starosta21">
+    <label>Parol</label><input id="stPass" placeholder="parol">
+    <button class="btn" id="stCreate" style="margin-top:10px">➕ Yaratish</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Parolni o'zgartirish</h3>
+    <label>Login</label><input id="spLogin">
+    <label>Yangi parol</label><input id="spPass">
+    <button class="btn ghost" id="spGo" style="margin-top:10px">🔑 O'zgartirish</button>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Starostalar</h3><div id="stList" class="muted">…</div></div>
+</div>
+
+<!-- Xavfsizlik -->
+<div id="tab-sec" class="hide">
+  <div class="card">
+    <h3 style="margin-top:0">🛡 Shubhali hodisalar</h3>
+    <p class="muted">Forward urinishi, boshqa qurilma, replay, Face ID xatosi — hammasi shu yerda.</p>
+    <div id="secList" class="muted">…</div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  ['over','grp','usr','str','sec'].forEach(t=>el('tab-'+t).classList.toggle('hide', t!==b.dataset.t));
+  if(b.dataset.t==='str') loadStarostas();
+});
+
+async function boot(){
+  const me=await api('/api/me');
+  if(!me.ok || me.user.role!=='super_admin'){ document.body.innerHTML='<div class="card">⛔️ Faqat super admin uchun.</div>'; return; }
+  el('who').textContent=me.user.name;
+  loadOverview();
+}
+async function loadOverview(){
+  const r=await api('/api/admin/overview'); if(!r.ok) return;
+  el('oGroups').textContent=r.groups.length; el('oUsers').textContent=r.users_total; el('oFace').textContent=r.faceid_total;
+  el('oGrpList').innerHTML = r.groups.map(g=>`<div class="list-item"><span>#${g.id} ${g.name}</span>
+     <span class="muted">${g.students} talaba · ${g.teachers} ustoz</span></div>`).join('')||'yo‘q';
+  el('oSessList').innerHTML = r.sessions.map(s=>`<div class="list-item"><span>#${s.id} g${s.group_id} · ${s.para}-para</span>
+     <span class="muted">${s.when} · ${s.status}</span></div>`).join('')||'yo‘q';
+  el('secList').innerHTML = r.security.map(e=>`<div class="list-item"><span class="s-late">${e.kind}</span>
+     <span class="muted">${e.when} · uid:${e.uid||'-'} · ${e.detail||''}</span></div>`).join('')||'✅ toza';
+}
+async function act(action, data, okMsg){
+  const r=await api('/api/admin/action', Object.assign({action}, data));
+  if(r.ok){ toast(okMsg||'✅ Bajarildi'); loadOverview(); } else toast(r.error||'Xato', true);
+  return r;
+}
+el('gCreate').onclick=()=>{ const n=el('gName').value.trim(); if(!n)return toast('Nom kiriting',true);
+  act('create_group',{name:n},'Guruh yaratildi').then(r=>{ if(r.ok) toast('ID: '+r.id); el('gName').value=''; }); };
+el('atGo').onclick=()=>act('assign_teacher',{group_id:+el('atGroup').value,tg_id:+el('atTg').value,subject:el('atSubj').value},'Ustoz biriktirildi');
+el('asGo').onclick=()=>act('add_student',{group_id:+el('asGroup').value,tg_id:+el('asTg').value},'Talaba qo‘shildi');
+el('rGo').onclick=()=>act('set_role',{tg_id:+el('rTg').value,role:el('rRole').value},'Rol saqlandi');
+el('dReset').onclick=()=>{ if(confirm('Face ID va qurilma tozalansinmi?')) act('reset_device',{tg_id:+el('dTg').value},'Reset qilindi'); };
+el('bBlock').onclick=()=>act('block',{tg_id:+el('bTg').value,value:true},'Bloklandi');
+el('bUnblock').onclick=()=>act('block',{tg_id:+el('bTg').value,value:false},'Blokdan chiqdi');
+el('stCreate').onclick=()=>act('starosta_create',{group_id:+el('stGroup').value,full_name:el('stName').value,login:el('stLogin').value,password:el('stPass').value},'Starosta yaratildi').then(loadStarostas);
+el('spGo').onclick=()=>act('starosta_passwd',{login:el('spLogin').value,password:el('spPass').value},'Parol o‘zgartirildi');
+async function loadStarostas(){
+  const r=await api('/api/admin/starostas'); if(!r.ok) return;
+  el('stList').innerHTML = r.starostas.map(s=>`<div class="list-item">
+    <span>${s.login} <small class="muted">(g${s.group_id})</small></span>
+    <span><span class="pill ${s.active?'ok':'bad'}">${s.active?'faol':'o‘chiq'}</span>
+    <button class="btn ghost sm" onclick="tgl('${s.login}')">⇄</button></span></div>`).join('')||'yo‘q';
+}
+async function tgl(login){ await act('starosta_toggle',{login},'O‘zgartirildi'); loadStarostas(); }
+window.tgl=tgl;
+boot();
+</script>
+</body>
+</html>

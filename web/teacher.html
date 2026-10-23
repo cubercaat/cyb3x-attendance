@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CYB3X Davomat — Ustoz</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="brand"><div class="logo">C</div>
+  <div><b>CYB3X DAVOMAT</b><small id="who">Ustoz paneli</small></div></div>
+
+<div class="tabs">
+  <button data-t="run" class="active">🎬 Davomat</button>
+  <button data-t="reports">📊 Hisobotlar</button>
+</div>
+
+<!-- ===== Davomat boshlash ===== -->
+<div id="tab-run">
+  <div id="starter" class="card">
+    <label>Guruh</label>
+    <select id="group"></select>
+    <label>Para</label>
+    <select id="para">
+      <option value="1">1-para</option><option value="2">2-para</option>
+      <option value="3">3-para</option><option value="4">4-para</option>
+      <option value="5">5-para</option><option value="6">6-para</option>
+    </select>
+    <label>Fan (ixtiyoriy)</label>
+    <input id="subject" placeholder="Masalan: Dasturlash">
+    <button class="btn" id="btnStart" style="margin-top:12px">▶️ Davomatni boshlash</button>
+  </div>
+
+  <!-- Faol sessiya -->
+  <div id="live" class="hide">
+    <div class="card hl center">
+      <div class="muted" id="liveInfo"></div>
+      <div class="qr-wrap"><div id="qr"></div></div>
+      <div class="muted">yoki kod:</div>
+      <div class="big-code" id="code">----</div>
+      <div class="timer"><i id="bar" style="width:100%"></i></div>
+      <p class="muted" style="margin-top:8px">📺 Buni doskaga/ekranga chiqaring. Talabalar skanerlaydi.</p>
+    </div>
+
+    <div class="card">
+      <div class="stat">
+        <div class="b"><div class="n s-present" id="cPresent">0</div><div class="l">Keldi</div></div>
+        <div class="b"><div class="n s-late" id="cLate">0</div><div class="l">Kech</div></div>
+        <div class="b"><div class="n s-absent" id="cAbsent">0</div><div class="l">Kelmadi</div></div>
+        <div class="b"><div class="n" id="cTotal">0</div><div class="l">Jami</div></div>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn ghost sm" id="btnManual">✍️ Qo'lda</button>
+        <button class="btn ghost sm" id="btnPause">⏸ Pauza</button>
+        <button class="btn ghost sm" id="btnReport">📥 Excel</button>
+        <button class="btn red sm" id="btnClose">⏹ Yopish</button>
+      </div>
+    </div>
+
+    <!-- Jonli ro'yxat -->
+    <div class="card">
+      <h3 style="margin-top:0">Jonli ro'yxat</h3>
+      <div id="liveList"></div>
+    </div>
+
+    <!-- Qo'lda belgilash -->
+    <div id="manualBox" class="card hide">
+      <div class="row sb"><h3 style="margin:0">Qo'lda belgilash</h3>
+        <button class="btn ghost sm" id="btnManualClose">✕</button></div>
+      <div id="manualList" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Hisobotlar ===== -->
+<div id="tab-reports" class="hide">
+  <div class="card"><h3 style="margin-top:0">Oxirgi sessiyalar</h3><div id="repList" class="muted">Yuklanmoqda…</div></div>
+</div>
+
+<script src="/static/app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+let SID=null, qr=null, tokTimer=null, liveTimer=null, STATUS='active';
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const t=b.dataset.t;
+  el('tab-run').classList.toggle('hide', t!=='run');
+  el('tab-reports').classList.toggle('hide', t!=='reports');
+  if(t==='reports') loadReports();
+});
+
+async function boot(){
+  const me=await api('/api/me');
+  if(!me.ok){ toast('Telegram orqali oching', true); return; }
+  el('who').textContent = me.user.name+' — '+(me.user.role==='super_admin'?'Super admin':'Ustoz');
+  const g=await api('/api/teacher/groups');
+  if(!g.ok){ toast(g.error,true); return; }
+  if(!g.groups.length){ el('group').innerHTML='<option>Guruh biriktirilmagan</option>'; el('btnStart').disabled=true; return; }
+  el('group').innerHTML = g.groups.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+}
+
+el('btnStart').onclick=async()=>{
+  el('btnStart').disabled=true;
+  const r=await api('/api/teacher/open',{group_id:el('group').value, para:el('para').value, subject:el('subject').value});
+  el('btnStart').disabled=false;
+  if(!r.ok){ toast(r.error,true); return; }
+  SID=r.session_id; hide('starter'); show('live'); STATUS='active';
+  startToken(); startLive();
+};
+
+/* Aylanuvchi QR + kod */
+async function refreshToken(){
+  if(!SID) return;
+  const r=await api('/api/teacher/token',{session_id:SID});
+  if(!r.ok) return;
+  el('code').textContent=r.code;
+  const box=el('qr'); box.innerHTML='';
+  qr=new QRCode(box,{text:r.token,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+  // taymer bar
+  let rem=r.remaining, ttl=r.ttl, bar=el('bar');
+  bar.style.transition='none'; bar.style.width=(rem/ttl*100)+'%';
+  requestAnimationFrame(()=>{ bar.style.transition='width '+rem+'s linear'; bar.style.width='0%'; });
+  el('liveInfo').innerHTML='🟢 <b>Faol</b> — QR har '+ttl+' soniyada yangilanadi';
+}
+function startToken(){ refreshToken(); clearInterval(tokTimer); tokTimer=setInterval(refreshToken, 2500); }
+
+/* Jonli sanoq */
+async function refreshLive(){
+  if(!SID) return;
+  const r=await api('/api/teacher/live',{session_id:SID});
+  if(!r.ok) return;
+  el('cPresent').textContent=r.present; el('cLate').textContent=r.late;
+  el('cAbsent').textContent=r.absent; el('cTotal').textContent=r.total;
+  el('liveList').innerHTML = r.rows.map(x=>{
+    const cls=x.status==='present'?'s-present':x.status==='late'?'s-late':'s-absent';
+    const ic=x.status==='present'?'✔':x.status==='late'?'⏰':'·';
+    return `<div class="list-item"><span>${x.name}</span><span class="${cls}">${ic} ${x.time}</span></div>`;
+  }).join('');
+}
+function startLive(){ refreshLive(); clearInterval(liveTimer); liveTimer=setInterval(refreshLive, 3000); }
+
+/* Boshqaruv */
+el('btnPause').onclick=async()=>{
+  STATUS = STATUS==='active'?'paused':'active';
+  await api('/api/teacher/close',{session_id:SID,status:STATUS});
+  el('btnPause').textContent = STATUS==='active'?'⏸ Pauza':'▶️ Davom';
+  toast(STATUS==='active'?'Davom etdi':'Pauza qilindi');
+};
+el('btnClose').onclick=async()=>{
+  if(!confirm('Davomatni yopamizmi?')) return;
+  await api('/api/teacher/close',{session_id:SID,status:'closed'});
+  clearInterval(tokTimer); clearInterval(liveTimer);
+  toast('✅ Sessiya yopildi'); hide('live'); show('starter'); SID=null;
+};
+el('btnReport').onclick=async()=>{
+  const r=await api('/api/teacher/report/build',{session_id:SID});
+  if(!r.ok){ toast(r.error,true); return; }
+  const a=document.createElement('a'); a.href=r.url; a.click();
+  toast('📥 Excel yuklanmoqda');
+};
+
+/* Qo'lda belgilash */
+el('btnManual').onclick=async()=>{
+  show('manualBox');
+  const r=await api('/api/teacher/students',{session_id:SID});
+  if(!r.ok){ toast(r.error,true); return; }
+  el('manualList').innerHTML = r.students.map(s=>`
+    <div class="list-item"><span>${s.name}</span><span>
+      <button class="btn sm" onclick="mark(${s.id},'present')">✔</button>
+      <button class="btn ghost sm" onclick="mark(${s.id},'late')">⏰</button>
+      <button class="btn ghost sm" onclick="mark(${s.id},'absent')">✘</button>
+    </span></div>`).join('');
+};
+el('btnManualClose').onclick=()=>hide('manualBox');
+async function mark(sid,status){
+  const r=await api('/api/teacher/manual',{session_id:SID,student_id:sid,status});
+  if(r.ok){ toast('Belgilandi'); refreshLive(); } else toast(r.error,true);
+}
+window.mark=mark;
+
+/* Hisobotlar */
+async function loadReports(){
+  const r=await api('/api/teacher/sessions');
+  if(!r.ok){ el('repList').textContent=r.error; return; }
+  if(!r.sessions.length){ el('repList').textContent='Hali sessiya yo‘q'; return; }
+  el('repList').innerHTML = r.sessions.map(s=>`
+    <div class="list-item"><span>${s.group} · ${s.para}-para<br><small class="muted">${s.when} · ${s.status}</small></span>
+    <button class="btn sm" onclick="dl(${s.id})">📥 Excel</button></div>`).join('');
+}
+async function dl(sid){
+  const r=await api('/api/teacher/report/build',{session_id:sid});
+  if(!r.ok){ toast(r.error,true); return; }
+  const a=document.createElement('a'); a.href=r.url; a.click();
+}
+window.dl=dl;
+
+boot();
+</script>
+</body>
+</html>

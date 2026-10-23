@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CYB3X Davomat — Talaba</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="brand">
+  <div class="logo">C</div>
+  <div><b>CYB3X DAVOMAT</b><small id="who">Yuklanmoqda…</small></div>
+</div>
+
+<!-- Yuklanish -->
+<div id="loading" class="card center"><span class="spin"></span> Tayyorlanmoqda…</div>
+
+<!-- Face ID o'rnatish -->
+<div id="setup" class="card hl hide">
+  <h3>🔐 Avval Face ID o'rnating</h3>
+  <p class="muted">Davomat faqat <b>sizning yuzingiz/barmoq izingiz</b> bilan belgilanadi.
+  Bu akkauntingizni boshqa birovga berib qo'yishning oldini oladi — kalit shu
+  telefoningizga bog'lanadi va undan chiqmaydi.</p>
+  <button class="btn" id="btnSetup">Face ID ni o'rnatish</button>
+  <p class="muted" id="setupNote" style="margin-top:10px"></p>
+</div>
+
+<!-- Asosiy -->
+<div id="main" class="hide">
+  <div class="card">
+    <div class="row sb">
+      <span class="pill ok" id="faceBadge">🔐 Face ID yoqilgan</span>
+      <span class="pill" id="devBadge">📱 Qurilma bog'langan</span>
+    </div>
+    <p class="muted" style="margin-top:10px">Doskadagi QR ni skanerlang <b>yoki</b> QR yonidagi 4 xonali kodni kiriting.
+    QR har bir necha soniyada yangilanadi — eski QR ishlamaydi.</p>
+    <button class="btn" id="btnScan" style="margin-top:8px">📷 QR skanerlash</button>
+    <button class="btn ghost" id="btnCode" style="margin-top:8px">⌨️ Kod kiritish</button>
+  </div>
+
+  <!-- Skaner -->
+  <div id="scanner" class="card hide">
+    <video id="video" playsinline></video>
+    <canvas id="canvas" class="hide"></canvas>
+    <p class="muted center" id="scanHint">QR ni ramka ichiga joylang…</p>
+    <button class="btn ghost" id="btnStopScan">Bekor qilish</button>
+  </div>
+
+  <!-- Kod kiritish -->
+  <div id="codebox" class="card hide">
+    <label>4 xonali kod (doskada)</label>
+    <input id="codeInput" inputmode="numeric" maxlength="4" placeholder="0000"
+           style="font-family:var(--mono);font-size:30px;text-align:center;letter-spacing:12px">
+    <button class="btn" id="btnCodeGo" style="margin-top:10px">Tasdiqlash</button>
+    <button class="btn ghost" id="btnCodeCancel" style="margin-top:8px">Bekor</button>
+  </div>
+
+  <div id="result" class="card center hide"></div>
+
+  <p class="center muted" style="margin-top:6px">
+    <a href="/app/help" target="_blank">📖 Qo'llanma</a> ·
+    Muammo bo'lsa botda <span class="kbd">#admin</span> yozing
+  </p>
+</div>
+
+<script src="/static/app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script>
+let ME=null, stream=null, scanning=false, busy=false;
+
+async function boot(){
+  const r = await api('/api/me');
+  hide('loading');
+  if(!r.ok){ el('who').textContent='Xatolik'; toast(r.error||'Telegram orqali oching', true); return; }
+  ME=r.user; el('who').textContent = (ME.name||'Talaba');
+  if(!faceSupported()){
+    el('setupNote').textContent='⚠️ Bu brauzer Face ID (WebAuthn) ni qo‘llamaydi. Mini appni Telegram ichida oching yoki telefon brauzerida oching.';
+  }
+  if(!ME.faceid){ show('setup'); } else { enterMain(); }
+}
+function enterMain(){ show('main'); el('devBadge').textContent = ME.device_bound?'📱 Qurilma bog‘langan':'📱 Shu qurilma'; }
+
+el('btnSetup').onclick = async ()=>{
+  if(!faceSupported()){ toast('Brauzer Face ID ni qo‘llamaydi', true); return; }
+  el('btnSetup').disabled=true; el('btnSetup').innerHTML='<span class="spin"></span> Face ID…';
+  try{ await faceRegister('Talaba telefoni'); toast('✅ Face ID o‘rnatildi'); ME.faceid=true; hide('setup'); enterMain(); }
+  catch(e){ toast('Xatolik: '+e.message, true); }
+  finally{ el('btnSetup').disabled=false; el('btnSetup').textContent='Face ID ni o‘rnatish'; }
+};
+
+/* ---- Belgilash yadrosi ---- */
+async function doMark(payload){
+  if(busy) return; busy=true;
+  showResult('<span class="spin"></span> Tekshirilmoqda…', '');
+  try{
+    payload.device = deviceRaw();
+    const prep = await api('/api/student/prepare', payload);
+    if(prep._status===428){ toast('Avval Face ID o‘rnating', true); show('setup'); busy=false; return; }
+    if(!prep.ok){ showResult('❌ '+(prep.error||'Xato'), 'bad'); toast(prep.error||'Xato', true); busy=false; return; }
+    // Face ID
+    const assertion = await faceAssert(prep.options);
+    payload.assertion = assertion;
+    const mk = await api('/api/student/mark', payload);
+    if(!mk.ok){ showResult('❌ '+(mk.error||'Xato'), 'bad'); toast(mk.error||'Xato', true); }
+    else{
+      const late = mk.status==='late';
+      showResult((late?'⏰':'✅')+' '+mk.message, late?'warn':'ok');
+      toast(mk.message);
+    }
+  }catch(e){ showResult('❌ Face ID bekor qilindi yoki xato', 'bad'); toast('Face ID: '+e.message, true); }
+  busy=false;
+}
+function showResult(htmlTxt, kind){
+  const r=el('result'); r.classList.remove('hide');
+  r.style.borderColor = kind==='ok'?'var(--accent2)':kind==='warn'?'var(--yellow)':kind==='bad'?'var(--red)':'var(--line)';
+  r.innerHTML = '<div style="font-size:19px;font-weight:800">'+htmlTxt+'</div>';
+}
+
+/* ---- Kod ---- */
+el('btnCode').onclick=()=>{ stopScan(); toggle('codebox'); el('codeInput').focus(); };
+el('btnCodeCancel').onclick=()=>hide('codebox');
+el('btnCodeGo').onclick=()=>{ const c=el('codeInput').value.trim(); if(c.length!==4){toast('4 xonali kod kiriting',true);return;} hide('codebox'); doMark({code:c}); };
+
+/* ---- Skaner (jsQR) — lokatsiya SO'RALMAYDI, faqat kamera ---- */
+el('btnScan').onclick=startScan;
+el('btnStopScan').onclick=stopScan;
+function toggle(id){ ['scanner','codebox','result'].forEach(x=>{ if(x!==id) hide(x); }); el(id).classList.toggle('hide'); }
+async function startScan(){
+  hide('codebox'); hide('result'); show('scanner');
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=el('video'); v.srcObject=stream; await v.play(); scanning=true; tick();
+  }catch(e){ toast('Kamera ochilmadi — kod bilan kiriting', true); hide('scanner'); }
+}
+function stopScan(){ scanning=false; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } hide('scanner'); }
+function tick(){
+  if(!scanning) return;
+  const v=el('video'), c=el('canvas');
+  if(v.readyState===v.HAVE_ENOUGH_DATA){
+    c.width=v.videoWidth; c.height=v.videoHeight;
+    const ctx=c.getContext('2d'); ctx.drawImage(v,0,0,c.width,c.height);
+    const img=ctx.getImageData(0,0,c.width,c.height);
+    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+    if(code && code.data){ stopScan(); doMark({token:code.data.trim()}); return; }
+  }
+  requestAnimationFrame(tick);
+}
+
+boot();
+</script>
+</body>
+</html>
