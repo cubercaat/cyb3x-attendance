@@ -130,6 +130,21 @@ async def healthz():
     return {"ok": True, "ts": dt.datetime.utcnow().isoformat()}
 
 
+# Telegram webhook (shared hosting rejimi) — maxfiy yo'l orqali
+@app.post(settings.webhook_path)
+async def telegram_webhook(req: Request):
+    if not settings.bot_token or settings.bot_token.startswith("TEST"):
+        return err("bot off", 503)
+    try:
+        update = await req.json()
+        from app.bot import feed_update
+        await feed_update(update)
+    except Exception as e:  # Telegram qayta yubormasligi uchun 200 qaytaramiz
+        import logging
+        logging.getLogger("cyb3x").warning("webhook error: %s", e)
+    return {"ok": True}
+
+
 # --------------------------------------------------------------------------- #
 #  Umumiy: men kimman?
 # --------------------------------------------------------------------------- #
@@ -609,6 +624,10 @@ async def admin_action(req: Request, x_init_data: str = Header(None, alias="X-In
                     stz.is_active = not stz.is_active
                     await db.commit()
                 res = {}
+            elif act == "purge_now":
+                from app.cleanup import purge_old
+                days = int(body.get("days", settings.retention_days))
+                res = await purge_old(days)
             else:
                 return err("Noma'lum amal")
             await svc.audit(db, u.tg_id, "admin:" + act, json.dumps(body)[:200])

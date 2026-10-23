@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     port: int = 8080
     database_url: str = "sqlite+aiosqlite:///./cyb3x.db"
 
+    # Davomat necha kun saqlanadi, keyin avtomatik tozalanadi (0 ga tushadi).
+    # Talaba/guruh/Face ID saqlanadi — faqat davomat yozuvlari o'chadi.
+    retention_days: int = 2
+    cleanup_every_hours: int = 6  # tozalash qancha vaqtda bir ishga tushadi
+
+    # Webhook rejimi — shared hosting (cPanel/Passenger) uchun. VPS da False (polling).
+    use_webhook: bool = False
+
+    @property
+    def webhook_secret(self) -> str:
+        import hashlib
+        return hashlib.sha256(("wh|" + self.secret_key).encode()).hexdigest()[:24]
+
+    @property
+    def webhook_path(self) -> str:
+        return f"/tg/{self.webhook_secret}"
+
     @property
     def rp_id(self) -> str:
         """WebAuthn Relying Party ID — domen (portsiz, sxemasiz). Face ID shu domenga bog'lanadi."""

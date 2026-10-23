@@ -50,7 +50,9 @@ lokatsiyasiz ishlash (anti-fishing) · imzolangan hisobot havolasi.
 
 **Davomat:** 1–6 para · sessiya ochish/pauza/yopish · QR skaner · 4-xonali kod ·
 kech/keldi/kelmadi avtomatik aniqlash (vaqt bo'yicha) · qo'lda belgilash
-(ustoz/admin/starosta) · jonli ro'yxat (real vaqtda) · bir martalik belgilash.
+(ustoz/admin/starosta) · jonli ro'yxat (real vaqtda) · bir martalik belgilash ·
+**avto-tozalash: davomat 2 kun saqlanadi, keyin 0 ga tushadi** (RETENTION_DAYS;
+talaba/guruh/Face ID saqlanadi) + super admin panelda "Hozir tozalash" tugmasi.
 
 **Boshqaruv:** guruh yaratish/ro'yxat · ustoz biriktirish (izolyatsiya bilan) ·
 talaba qo'shish · rol berish · starosta yaratish/parol/yoqish-o'chirish ·

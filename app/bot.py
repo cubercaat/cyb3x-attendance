@@ -311,5 +311,18 @@ async def notify(tg_id: int, text: str) -> None:
 
 
 async def run_bot() -> None:
+    """VPS / lokal — polling rejimi."""
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot, handle_signals=False)
+
+
+async def setup_webhook() -> None:
+    """Shared hosting — webhook rejimi. Telegramga PUBLIC_URL/tg/<secret> ni o'rnatadi."""
+    url = settings.public_url.rstrip("/") + settings.webhook_path
+    await bot.set_webhook(url, drop_pending_updates=True)
+
+
+async def feed_update(update: dict) -> None:
+    """Webhook kelgan update ni aiogram ga uzatish (api.py chaqiradi)."""
+    from aiogram.types import Update
+    await dp.feed_update(bot, Update.model_validate(update, context={"bot": bot}))

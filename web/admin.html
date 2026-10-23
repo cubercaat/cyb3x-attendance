@@ -30,6 +30,11 @@
   </div>
   <div class="card"><h3 style="margin-top:0">Guruhlar</h3><div id="oGrpList" class="muted">…</div></div>
   <div class="card"><h3 style="margin-top:0">Oxirgi sessiyalar</h3><div id="oSessList" class="muted">…</div></div>
+  <div class="card">
+    <h3 style="margin-top:0">🗑 Bazani tozalash</h3>
+    <p class="muted">Davomat avtomatik 2 kun saqlanadi, keyin 0 ga tushadi. Shu yerda qo'lda ham tozalash mumkin (talaba/Face ID saqlanadi).</p>
+    <button class="btn red" id="btnPurge">Hozir tozalash (davomatni 0 ga)</button>
+  </div>
 </div>
 
 <!-- Guruhlar -->
@@ -164,6 +169,8 @@ async function loadStarostas(){
 }
 async function tgl(login){ await act('starosta_toggle',{login},'O‘zgartirildi'); loadStarostas(); }
 window.tgl=tgl;
+el('btnPurge').onclick=()=>{ if(confirm('Barcha davomat yozuvlari 0 ga tushsinmi? (talaba va Face ID saqlanadi)'))
+  act('purge_now',{days:0},'🗑 Baza tozalandi'); };
 boot();
 </script>
 </body>
